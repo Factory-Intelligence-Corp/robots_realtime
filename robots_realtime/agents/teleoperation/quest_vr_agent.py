@@ -43,14 +43,18 @@ from robots_realtime.utils.portal_utils import remote
 
 logger = logging.getLogger(__name__)
 
-# YAM joint limits from yam.xml — used for velocity clamping and danger zones
+# YAM joint limits — ordered tip-to-base to match PyRoki's internal joint
+# ordering (URDF defines joints from link_6 down to base_link, so PyRoki
+# array index 0 = joint6, index 5 = joint1).
+# joint2 upper limit tightened from 3.65 to 2.8 rad (~160°) to prevent
+# the arm from going parallel to the table surface.
 _YAM_JOINT_LIMITS: List[Tuple[float, float]] = [
-    (-2.61799, 3.13),   # joint1
-    (0.0, 3.65),        # joint2
-    (0.0, 3.13),        # joint3
-    (-1.65, 1.65),      # joint4
-    (-1.5708, 1.5708),  # joint5
-    (-2.0944, 2.0944),  # joint6
+    (-2.0944, 2.0944),  # joint6 (PyRoki idx 0)
+    (-1.5708, 1.5708),  # joint5 (PyRoki idx 1)
+    (-1.5708, 1.5708),  # joint4 (PyRoki idx 2)
+    (0.0, 3.13),        # joint3 (PyRoki idx 3)
+    (0.15, 2.8),        # joint2 (PyRoki idx 4) — clamped to avoid table collision
+    (-2.61799, 3.13),   # joint1 (PyRoki idx 5)
 ]
 
 _DANGER_ZONE_RAD = 0.05
