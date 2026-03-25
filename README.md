@@ -29,6 +29,15 @@ source .venv/bin/activate
 uv venv --python 3.11
 uv pip install -e .
 ```
+
+### Working with the `teleop-bridge` submodule
+When working with making changes in the submodule `dependencies/teleop-bridge`, make sure changes are made in the teleop-bridge repository first
+
+Get the updated version of the module by running
+```bash
+git submodule update --remote dependencies/teleop-bridge
+```
+
 ## Configuration
 If using YAM arms, configure YAM arms CAN chain according to instructions from the [I2RT repo](https://github.com/i2rt-robotics/i2rt)
 
@@ -163,6 +172,7 @@ When the page loads you will see the Vuer WebXR scene with a blue grid floor and
 | `yam_quest_bimanual.yaml` | Real hardware | Bimanual YAM arms with Quest VR |
 | `yam_quest_pick_red_cube_sim.yaml` | Simulation | Bimanual YAM + red cube pick task (camera streaming on) |
 | `yam_quest_mujoco_sim.yaml` | Simulation | Single YAM arm in plain MuJoCo sim (camera streaming on) |
+| `yam_webrtc_bimanual_mujoco_sim.yaml` | Simulation | Bimanual YAM + Remote Teleop WebRTC connection | 
 
 ### Tunable parameters (in YAML config under `agent:`)
 
@@ -210,3 +220,4 @@ ruff format # code format
 - [ ] Add data logging infrastructure
 - [ ] Implement a [Diffusion Policy](https://diffusion-policy.cs.columbia.edu/) agent controller
 - [ ] Implement a [Physical Intelligence π0](https://www.physicalintelligence.company/blog/pi0) agent controller
+- [ ] Implement bimanual arms reset mechanism for teleop
