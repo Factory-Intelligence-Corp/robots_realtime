@@ -1,0 +1,64 @@
+# YAM Bimanual MuJoCo Simulation driven by WebRTC (Quest VR or Mouse Emulator).
+#
+# Both arms in simulation, controlled via WebRTC DataChannel.
+# Use Mouse Emulator mode in the browser for keyboard/mouse control.
+#
+# ── Prerequisites ──────────────────────────────────────────────────────
+#
+#   Install the webrtc_teleop optional dependencies:
+#     source .venv/bin/activate && uv pip install -e ".[webrtc_teleop,webrtc_aiortc]"
+#
+#   Start the signaling server:
+#     cd ../teleop-signaling && source .venv/bin/activate
+#     SIGNALING_TOKEN="" uvicorn signaling.server:app --host 0.0.0.0 --port 8000
+#
+#   Then open http://localhost:8000 in the browser, select Mouse Emulator, Connect.
+#
+# ── Usage ──────────────────────────────────────────────────────────────
+#
+#   uv run python robots_realtime/envs/launch.py \
+#       --config-path configs/yam/yam_webrtc_bimanual_mujoco_sim.yaml
+#
+
+_target_: robots_realtime.envs.launch.LaunchConfig
+sim_mode: true
+hz: 50.0
+
+robots:
+  bimanual:
+    _target_: robots_realtime.robots.yam_pick_red_cube_sim_robot.YamPickRedCubeSimRobot
+    station_key: "SIM_YAM"
+    right_arm_only: false
+    render: true
+    randomize_scene: false
+    control_dt: 0.02
+    camera_obs: false
+
+agent:
+  _target_: robots_realtime.agents.teleoperation.webrtc_teleop_agent.WebRTCTeleopAgent
+  bimanual: true
+  bimanual_combined_key: "bimanual"
+  # -- Bridge / WebRTC params --
+  transport: aiortc
+  signaling_url: "http://localhost:8000"
+  signaling_token: ""
+  ice_servers:
+    - urls: "stun:stun.l.google.com:19302"
+  # No camera devices for sim
+  camera_devices: []
+  camera_fps: 30
+  max_velocity: 5.0
+  # -- Motion / IK params --
+  position_scale: 0.5
+  smoothing_omega: 8.0
+  smoothing_alpha: 0.4
+  max_joint_vel: 0.5
+  danger_zone_margin: 0.05
+  workspace_radius: 0.50
+  debug_mapping: true
+  deadzone_m: 0.004
+  track_orientation: true
+  ik_pos_weight: 50.0
+  ik_ori_weight: 10.0
+  ik_rest_weight: 0.05
+  home_vel: 0.8

@@ -11,3 +11,6 @@
 [submodule "dependencies/mjlab"]
 	path = dependencies/mjlab
 	url = https://github.com/mujocolab/mjlab.git
+[submodule "dependencies/teleop-bridge"]
+	path = dependencies/teleop-bridge
+	url = https://github.com/Factory-Intelligence-Corp/teleop-bridge.git
