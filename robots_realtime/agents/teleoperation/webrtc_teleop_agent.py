@@ -37,6 +37,7 @@ import yourdfpy
 from dm_env.specs import Array
 
 from robots_realtime.agents.agent import Agent
+from robots_realtime.agents.constants import ActionSpec
 from robots_realtime.agents.teleoperation.quest_vr_agent import (
     _DANGER_ZONE_RAD,
     _GRIPPER_CLOSED,
@@ -109,6 +110,7 @@ class WebRTCTeleopAgent(Agent):
         camera_devices: Optional[List[int]] = None,
         camera_resolution: Optional[List[int]] = None,
         camera_fps: int = 30,
+        video_sources: Optional[List[Dict[str, Any]]] = None,
         max_velocity: Optional[float] = 5.0,
         # Motion / IK params (same as QuestVRAgent)
         position_scale: float = 1.0,
@@ -244,10 +246,39 @@ class WebRTCTeleopAgent(Agent):
             bridge_kwargs["ice_servers"] = ice_servers
         if max_velocity is not None:
             bridge_kwargs["max_velocity"] = max_velocity
-        if camera_devices is not None:
-            bridge_kwargs["camera_devices"] = camera_devices
-        if camera_resolution is not None:
-            bridge_kwargs["camera_resolution"] = camera_resolution
+        # -- Build video frame sources -----------------------------------------
+        self._obs_push_sources: Dict[str, Any] = {}
+        built_frame_sources: List[Any] = []
+
+        if video_sources is not None:
+            from bridge.frame_source import CameraFrameSource, PushFrameSource
+
+            res = camera_resolution or [640, 480]
+            for vs in video_sources:
+                vs_type = vs.get("type", "camera")
+                if vs_type == "camera":
+                    src = CameraFrameSource(
+                        device=vs["device"],
+                        width=res[0],
+                        height=res[1],
+                        fps=camera_fps,
+                    )
+                    built_frame_sources.append(src)
+                elif vs_type == "obs":
+                    src = PushFrameSource(width=res[0], height=res[1])
+                    self._obs_push_sources[vs["obs_key"]] = src
+                    built_frame_sources.append(src)
+                else:
+                    raise ValueError(f"Unknown video_source type: {vs_type!r}")
+
+            bridge_kwargs["frame_sources"] = built_frame_sources
+        else:
+            # Backward compat: use camera_devices directly
+            if camera_devices is not None:
+                bridge_kwargs["camera_devices"] = camera_devices
+            if camera_resolution is not None:
+                bridge_kwargs["camera_resolution"] = camera_resolution
+
         bridge_kwargs["camera_fps"] = camera_fps
 
         self._bridge_config = BridgeConfig(**bridge_kwargs)
@@ -341,6 +372,16 @@ class WebRTCTeleopAgent(Agent):
         now = time.time()
         dt = now - self._last_act_time
         self._last_act_time = now
+
+        # Push camera frames from observations to WebRTC video tracks
+        if self._obs_push_sources:
+            robot_obs = obs.get(self.bimanual_combined_key, obs) if self.bimanual_combined_key else obs
+            for obs_key, push_src in self._obs_push_sources.items():
+                cam_data = robot_obs.get(obs_key)
+                if cam_data is not None and isinstance(cam_data, dict):
+                    rgb = cam_data.get("images", {}).get("rgb")
+                    if rgb is not None:
+                        push_src.push(rgb)
 
         # Read controller state from the bridge (already thread-safe)
         ctrl = self._bridge.ctrl_state.read()
@@ -492,21 +533,25 @@ class WebRTCTeleopAgent(Agent):
                         ik_pos = self._pos_filter[side].step(target_pos, dt)
                         ik_wxyz = self._default_wxyz
 
-                        if self._track_orientation and self._anchor_ctrl_wxyz[side] is not None:
+                        anchor_ctrl_q = self._anchor_ctrl_wxyz[side]
+                        anchor_ee_q = self._anchor_ee_wxyz[side]
+                        smoothed_q = self._smoothed_target_wxyz[side]
+                        if self._track_orientation and anchor_ctrl_q is not None and anchor_ee_q is not None and smoothed_q is not None:
                             delta_q = _quat_mul_wxyz(
                                 ctrl_wxyz_robot,
-                                _quat_conj_wxyz(self._anchor_ctrl_wxyz[side]),
+                                _quat_conj_wxyz(anchor_ctrl_q),
                             )
                             delta_q = np.array(delta_q)
-                            target_wxyz = _quat_mul_wxyz(delta_q, self._anchor_ee_wxyz[side])
+                            target_wxyz = _quat_mul_wxyz(delta_q, anchor_ee_q)
                             target_wxyz /= np.linalg.norm(target_wxyz)
 
-                            self._smoothed_target_wxyz[side] = _slerp_wxyz(
-                                self._smoothed_target_wxyz[side],
+                            smoothed_q = _slerp_wxyz(
+                                smoothed_q,
                                 target_wxyz,
                                 self.smoothing_alpha,
                             )
-                            ik_wxyz = self._smoothed_target_wxyz[side]
+                            self._smoothed_target_wxyz[side] = smoothed_q
+                            ik_wxyz = smoothed_q
 
                             if self._debug_mapping and self._debug_counter % 50 == 0:
                                 _, ee_wxyz_now = self._compute_ee_pose(self._joints[side])
@@ -590,12 +635,12 @@ class WebRTCTeleopAgent(Agent):
         return action
 
     @remote(serialization_needed=True)
-    def action_spec(self) -> Dict[str, Dict[str, Array]]:
+    def action_spec(self) -> ActionSpec:
         if self.bimanual and self.bimanual_combined_key is not None:
             return {
                 self.bimanual_combined_key: {"pos": Array(shape=(14,), dtype=np.float32)},
             }
-        spec: Dict[str, Dict[str, Array]] = {
+        spec: Dict[str, ActionSpec] = {
             "left": {"pos": Array(shape=(7,), dtype=np.float32)},
         }
         if self.bimanual:

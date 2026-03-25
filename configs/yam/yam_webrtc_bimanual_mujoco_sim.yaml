@@ -32,7 +32,9 @@ robots:
     render: true
     randomize_scene: false
     control_dt: 0.02
-    camera_obs: false
+    camera_obs: true
+    render_cameras: ["top", "front"]   # Only render what we stream (skip wrist cams)
+    camera_render_fps: 30              # Render at video FPS, not control loop Hz
 
 agent:
   _target_: robots_realtime.agents.teleoperation.webrtc_teleop_agent.WebRTCTeleopAgent
@@ -44,8 +46,12 @@ agent:
   signaling_token: ""
   ice_servers:
     - urls: "stun:stun.l.google.com:19302"
-  # No camera devices for sim
-  camera_devices: []
+  # Stream MuJoCo rendered frames via WebRTC (top + front camera angles)
+  video_sources:
+    - type: obs
+      obs_key: top_camera
+    - type: obs
+      obs_key: front_camera
   camera_fps: 30
   max_velocity: 5.0
   # -- Motion / IK params --

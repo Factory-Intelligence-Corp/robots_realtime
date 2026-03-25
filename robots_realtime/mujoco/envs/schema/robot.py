@@ -55,6 +55,7 @@ class BimanualWorkstationSpecConfig(MujocoSpecConfig):
     left_arm_T_right_arm: Transform3D
     xml_path: str = str(MENAGERIE_ROOT / "production" / "oreo_urdf" / "station" / "station.xml")
     left_arm_T_top_left_camera: Transform3D = Transform3D()
+    left_arm_T_front_camera: Transform3D | None = None
     world_T_left_arm: Transform3D = Transform3D()
 
 
@@ -208,6 +209,19 @@ STATION_ROBOT_MAP: Dict[str, BimanualStationSpecConfig] = {
             left_arm_T_top_left_camera=Transform3D(
                 position=[0.08600512 - 0.2525, -0.305, 0.95432053],
                 quaternion_wxyz=[0.183, -0.683, 0.683, -0.183],
+            ),
+            # Front camera: in front of and above the workspace, looking down at table.
+            # Composed rotation: 90° around Y (look -X) then -110° around local X.
+            # q_Y90 = [0.7071, 0, 0.7071, 0]
+            # q_X(-110°) = [cos(-55°), sin(-55°), 0, 0] = [0.5736, -0.8192, 0, 0]
+            # q = q_Y90 * q_X(-110°):
+            #   w = 0.7071*0.5736 = 0.4056
+            #   x = 0.7071*-0.8192 = -0.5793
+            #   y = 0.7071*-0.8192 = -0.5793
+            #   z = 0.7071*0.5736 = 0.4056
+            left_arm_T_front_camera=Transform3D(
+                position=[0.80, -0.305, 0.35],
+                quaternion_wxyz=[0.4056, -0.5793, -0.5793, 0.4056],
             ),
         ),
         wrist_camera=INTEL_D405_CAMERA_SPEC_CONFIG,
