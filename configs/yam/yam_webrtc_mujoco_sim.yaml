@@ -1,0 +1,62 @@
+# YAM MuJoCo Simulation driven by Quest 3 / 3S VR controllers via WebRTC.
+#
+# No physical leader device required. Control the arm by moving the
+# Quest controller in space (hold trigger to engage, grip=close gripper,
+# A/X=home reset, B/Y=open gripper).
+#
+# ── Prerequisites ──────────────────────────────────────────────────────
+#
+#   Install the webrtc_teleop + mjlab_sim optional dependencies:
+#     source .venv/bin/activate && uv sync --extra webrtc_teleop --extra webrtc_aiortc --extra mjlab_sim
+#
+#   Start the signaling server (local or on Fly.io).
+#   Open the signaling URL in the Quest browser.
+#
+# ── Usage ──────────────────────────────────────────────────────────────
+#
+#   uv run python robots_realtime/envs/launch.py \
+#       --config-path configs/yam/yam_webrtc_mujoco_sim.yaml
+#
+
+_target_: robots_realtime.envs.launch.LaunchConfig
+sim_mode: true
+hz: 50.0
+
+robots:
+  left:
+    _target_: robots_realtime.robots.mujoco_sim_robot.MujocoSimRobot
+    xml_path: "dependencies/i2rt/i2rt/robot_models/yam/yam.xml"
+    render: true
+    camera_obs: true
+    camera_width: 640
+    camera_height: 480
+    camera_pos: [0.6, -0.3, 0.6]
+    camera_lookat: [0.0, 0.0, 0.15]
+
+agent:
+  _target_: robots_realtime.agents.teleoperation.webrtc_teleop_agent.WebRTCTeleopAgent
+  bimanual: false
+  # -- Bridge / WebRTC params --
+  transport: aiortc
+  signaling_url: "http://localhost:8000"
+  signaling_token: ""
+  ice_servers:
+    - urls: "stun:stun.l.google.com:19302"
+  # No camera devices for sim (video handled by bridge if needed)
+  camera_devices: []
+  camera_fps: 30
+  max_velocity: 5.0
+  # -- Motion / IK params --
+  position_scale: 0.5
+  smoothing_omega: 8.0
+  smoothing_alpha: 0.4
+  max_joint_vel: 0.5
+  danger_zone_margin: 0.05
+  workspace_radius: 0.50
+  debug_mapping: true
+  deadzone_m: 0.004
+  track_orientation: true
+  ik_pos_weight: 50.0
+  ik_ori_weight: 10.0
+  ik_rest_weight: 0.05
+  home_vel: 0.8

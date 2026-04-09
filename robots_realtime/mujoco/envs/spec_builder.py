@@ -63,6 +63,16 @@ def compile_station_spec(
         transform=world_T_top_left_camera,
     )
 
+    # Optional front camera
+    if station_spec_config.workstation.left_arm_T_front_camera is not None:
+        world_T_front_camera = world_T_left @ station_spec_config.workstation.left_arm_T_front_camera
+        attach_camera(
+            parent=station_spec.worldbody,
+            name="front_camera",
+            camera_spec_config=station_spec_config.top_camera,
+            transform=world_T_front_camera,
+        )
+
     # build arm with the wrist camera
     arm_spec = build_arm_with_camera(
         robot=robot_spec_config,

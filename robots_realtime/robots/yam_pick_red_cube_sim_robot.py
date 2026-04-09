@@ -11,7 +11,7 @@ Prerequisites:
       DYLD_LIBRARY_PATH=... .venv/bin/mjpython robots_realtime/envs/launch.py ...
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 from i2rt.robots.robot import Robot
@@ -44,6 +44,8 @@ class YamPickRedCubeSimRobot(Robot):
         randomize_scene: bool = False,
         control_dt: float = 0.02,
         camera_obs: bool = False,
+        render_cameras: Optional[List[str]] = None,
+        camera_render_fps: float = 0,
     ) -> None:
         from robots_realtime.mujoco.envs.schema.robot import STATION_ROBOT_MAP
         from robots_realtime.mujoco.envs.yam_env import YamEnvPickRedCube
@@ -54,6 +56,8 @@ class YamPickRedCubeSimRobot(Robot):
             control_dt=control_dt,
             randomize_scene=randomize_scene,
             camera_obs=camera_obs,
+            render_cameras=render_cameras,
+            camera_render_fps=camera_render_fps,
         )
         self._right_arm_only = right_arm_only
         arm_dofs = station_spec.robot.num_joint_dofs  # 6
@@ -127,7 +131,7 @@ class YamPickRedCubeSimRobot(Robot):
             }
 
         # Forward camera observations from the underlying environment
-        for cam_key in ("top_camera", "left_camera", "right_camera"):
+        for cam_key in ("top_camera", "left_camera", "right_camera", "front_camera"):
             if cam_key in obs:
                 result[cam_key] = obs[cam_key]
 

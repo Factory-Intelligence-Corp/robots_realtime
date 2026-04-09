@@ -49,6 +49,15 @@ mjlab_sim = [
 quest_vr = [
     "vuer",
 ]
+webrtc_teleop = [
+    "teleop-bridge",
+]
+webrtc_aiortc = [
+    "teleop-bridge",
+    "aiortc>=1.9,<2",
+    "av>=12",
+    "opencv-python-headless>=4.9,<5",
+]
 
 [tool.uv.sources]
 pyroki = { path = "dependencies/pyroki", editable = true }
@@ -58,10 +67,14 @@ pyzed = { path = "dependencies/pyzed-5.1-cp311-cp311-linux_x86_64.whl" }
 i2rt = { path = "dependencies/i2rt", editable = true }
 lerobot_teleoperator_yamactiveleader = { git = "https://github.com/uynitsuj/lerobot_teleoperator_yamactiveleader.git" }
 mjlab = { path = "dependencies/mjlab", editable = true }
+teleop-bridge = { path = "dependencies/teleop-bridge", editable = true }
 
 [tool.uv]
 override-dependencies = [
     "numpy==1.26.4",
+    # JAX 0.9+ requires numpy 2.x StringDType; pin to 0.4.x for numpy 1.26.4 compat.
+    "jax==0.4.26",
+    "jaxlib==0.4.26",
     # mjlab requires mujoco>=3.5.0 and tyro>=1.0.1; override i2rt's hard pins.
     # dm_control>=1.0.30 only needs mujoco>=3.3.2, so 3.5.0 is fine for all.
     "mujoco>=3.5.0",

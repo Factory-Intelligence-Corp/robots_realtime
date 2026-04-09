@@ -35,6 +35,10 @@ class YamEnv(dm_env.Environment):
             "left": left_camera,
             "right": right_camera,
         }
+        # Optional front camera (only present in some station configs)
+        front_camera = next((x for x in cameras if "front" in x.name), None)
+        if front_camera is not None:
+            self.camera_ids["front"] = front_camera.name
         station_spec = self._add_others(station_spec)
 
         # add floating camera
@@ -85,12 +89,19 @@ class YamEnv(dm_env.Environment):
         randomize_scene: bool = True,
         dm_env: bool = False,
         camera_obs: bool = True,
+        render_cameras: Optional[list[str]] = None,
+        camera_render_fps: float = 0,
     ) -> None:
         self._station_spec_config = station_spec_config
         self._robot_spec_config = station_spec_config.robot
         self._model = self._build_model()
         self._data = mujoco.MjData(self._model)
         self._camera_obs = camera_obs
+        self._render_cameras = render_cameras  # None = all in camera_ids
+        # Rate-limit camera rendering (0 = render every tick)
+        self._camera_render_interval = 1.0 / camera_render_fps if camera_render_fps > 0 else 0.0
+        self._last_camera_render_time = 0.0
+        self._cached_camera_obs: Dict[str, Any] = {}
 
         self._height = 480
         self._width = 640
@@ -206,11 +217,13 @@ class YamEnv(dm_env.Environment):
             spec[f"{side}"] = _spec
 
         if self._camera_obs:
-            for camera in ["top", "left", "right"]:
-                spec[f"{camera}_camera"] = {
-                    "images": {"rgb": specs.Array(shape=(self._height, self._width, 3), dtype=np.uint8)},
-                    "timestamp": specs.Array(shape=(1,), dtype=np.float32),
-                }
+            cameras = self._render_cameras if self._render_cameras is not None else list(self.camera_ids)
+            for camera in cameras:
+                if camera in self.camera_ids:
+                    spec[f"{camera}_camera"] = {
+                        "images": {"rgb": specs.Array(shape=(self._height, self._width, 3), dtype=np.uint8)},
+                        "timestamp": specs.Array(shape=(1,), dtype=np.float32),
+                    }
         spec["state"] = specs.Array(shape=self.state.shape, dtype=np.float32)
         spec["timestamp"] = specs.Array(shape=(1,), dtype=np.float32)
         return spec
@@ -260,12 +273,28 @@ class YamEnv(dm_env.Environment):
             obs[f"{side_name}"] = _obs
 
         if self._camera_obs:
-            for camera in ["top", "left", "right"]:
-                cam_name = self.camera_ids[camera]
-                obs[f"{camera}_camera"] = {
-                    "images": {"rgb": self.render(cam_name)},
-                    "timestamp": time.time(),
-                }
+            # Determine which cameras to render
+            cameras_to_render = self._render_cameras if self._render_cameras is not None else list(self.camera_ids)
+
+            # Rate-limit rendering: skip if we rendered recently enough
+            now = time.time()
+            should_render = (
+                self._camera_render_interval <= 0.0
+                or (now - self._last_camera_render_time) >= self._camera_render_interval
+            )
+
+            if should_render:
+                self._last_camera_render_time = now
+                for camera in cameras_to_render:
+                    if camera in self.camera_ids:
+                        cam_name = self.camera_ids[camera]
+                        self._cached_camera_obs[f"{camera}_camera"] = {
+                            "images": {"rgb": self.render(cam_name)},
+                            "timestamp": now,
+                        }
+
+            # Always include cached frames in observations
+            obs.update(self._cached_camera_obs)
 
         mujoco.mj_getState(self._model, self._data, self.state, mujoco.mjtState.mjSTATE_INTEGRATION)
         obs["state"] = self.state.copy()

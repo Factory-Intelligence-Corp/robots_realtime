@@ -1,0 +1,81 @@
+# YAM bimanual arms controlled by Quest 3 / 3S VR controllers via WebRTC
+# (REAL HARDWARE).
+#
+# Left Quest controller drives left arm, right controller drives right arm.
+# Hold trigger to engage teleoperation.
+#
+# ── Prerequisites ──────────────────────────────────────────────────────
+#
+#   1. Install the webrtc_teleop optional dependency:
+#        source .venv/bin/activate && uv sync --extra webrtc_teleop --extra webrtc_aiortc
+#
+#   2. Set up CAN interfaces for both YAM arms (see I2RT repo docs).
+#
+#   3. Start the signaling server (local or on Fly.io) and the
+#      teleop-bridge will connect automatically.
+#
+#   4. Open the signaling server URL in the Quest browser.
+#
+# ── Usage ──────────────────────────────────────────────────────────────
+#
+#   uv run python robots_realtime/envs/launch.py \
+#       --config-path configs/yam/yam_webrtc_bimanual.yaml
+#
+
+_target_: robots_realtime.envs.launch.LaunchConfig
+hz: 30.0
+
+# Uncomment to add camera sensors (video is streamed by the bridge, not the agent):
+# sensors:
+#   cameras:
+#     top_camera:
+#         _target_: robots_realtime.sensors.cameras.camera.CameraNode
+#         camera:
+#             _target_: robots_realtime.sensors.cameras.opencv_camera.OpencvCamera
+#             device_path: "/dev/video4"
+#             camera_type: "realsense_camera"
+
+robots:
+  left: ["robot_configs/yam/left.yaml"]
+  right: ["robot_configs/yam/left.yaml", "robot_configs/yam/right.yaml"]
+
+agent:
+  _target_: robots_realtime.agents.teleoperation.webrtc_teleop_agent.WebRTCTeleopAgent
+  bimanual: true
+  # -- Bridge / WebRTC params --
+  transport: aiortc
+  signaling_url: "https://your-signal-server.fly.dev"
+  signaling_token: ""
+  ice_servers:
+    - urls: "stun:stun.l.google.com:19302"
+  # Uncomment for TURN relay (required for cross-network):
+  # - urls: "turn:your-turn-server:443?transport=tcp"
+  #   username: "user"
+  #   credential: "pass"
+  camera_devices: [0, 4]
+  camera_resolution: [640, 480]
+  camera_fps: 30
+  max_velocity: 5.0
+  # -- Motion / IK params (same as yam_quest_bimanual.yaml) --
+  position_scale: 0.5
+  smoothing_omega: 8.0
+  smoothing_alpha: 0.4
+  max_joint_vel: 0.3
+  danger_zone_margin: 0.05
+  workspace_radius: 0.42
+  debug_mapping: true
+  deadzone_m: 0.004
+  track_orientation: true
+  ik_pos_weight: 50.0
+  ik_ori_weight: 10.0
+  ik_rest_weight: 0.05
+  home_vel: 0.8
+  # Effort-based collision detection — set a limit appropriate for your setup
+  # effort_limit: 5.0
+
+station_metadata:
+  world_frame: "left_arm" # front x, left y, up z
+  extrinsics:
+    right_arm_extrinsic:
+      position: [0.0, -0.61, 0.0]
+      rotation: [1.0, 0.0, 0.0, 0.0]
